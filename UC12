@@ -1,0 +1,136 @@
+import java.io.*;
+import java.util.*;
+
+// ----------------------------------------------------------
+// Model Classes (Serializable)
+// ----------------------------------------------------------
+class Booking implements Serializable {
+    String bookingId;
+    String guestName;
+    String roomType;
+    String roomId;
+
+    Booking(String bookingId, String guestName, String roomType, String roomId) {
+        this.bookingId = bookingId;
+        this.guestName = guestName;
+        this.roomType = roomType;
+        this.roomId = roomId;
+    }
+
+    @Override
+    public String toString() {
+        return bookingId + " | " + guestName + " | " + roomType + " | " + roomId;
+    }
+}
+
+class SystemState implements Serializable {
+    Map<String, Integer> inventory;
+    Map<String, Booking> bookingHistory;
+
+    SystemState(Map<String, Integer> inventory, Map<String, Booking> bookingHistory) {
+        this.inventory = inventory;
+        this.bookingHistory = bookingHistory;
+    }
+}
+
+// ----------------------------------------------------------
+// Persistence Service
+// ----------------------------------------------------------
+class PersistenceService {
+
+    private final String FILE_NAME = "system_state.dat";
+
+    public void saveSystemState(SystemState state) {
+        try (ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(FILE_NAME))) {
+            out.writeObject(state);
+            System.out.println("\n✔ System state saved successfully.");
+        } catch (Exception e) {
+            System.out.println("❌ Error saving system state: " + e.getMessage());
+        }
+    }
+
+    public SystemState loadSystemState() {
+        try (ObjectInputStream in = new ObjectInputStream(new FileInputStream(FILE_NAME))) {
+            SystemState state = (SystemState) in.readObject();
+            System.out.println("✔ System state restored successfully.");
+            return state;
+        } catch (FileNotFoundException e) {
+            System.out.println("⚠ No saved state found. Starting fresh.");
+        } catch (Exception e) {
+            System.out.println("❌ Error loading state. Starting fresh.");
+        }
+        return null;
+    }
+}
+
+// ----------------------------------------------------------
+// Main Application Logic
+// ----------------------------------------------------------
+public class UseCase12DataPersistenceRecovery {
+
+    private static Map<String, Integer> inventory = new HashMap<>();
+    private static Map<String, Booking> bookingHistory = new HashMap<>();
+    private static PersistenceService storage = new PersistenceService();
+
+    public static void main(String[] args) {
+
+        System.out.println("=== USE CASE 12: DATA PERSISTENCE & SYSTEM RECOVERY ===");
+
+        // STEP 1 — Try to restore data
+        restoreSystemState();
+
+        // STEP 2 — If fresh system, add sample bookings
+        if (bookingHistory.isEmpty()) {
+            System.out.println("\nNo previous data → Initializing sample system state...");
+            initializeSampleData();
+        }
+
+        // STEP 3 — Print current system state
+        displaySystemState();
+
+        // STEP 4 — Save state on "shutdown"
+        saveSystemState();
+    }
+
+    // ------------------------------------------------------
+    // Initialize sample state (first run)
+    // ------------------------------------------------------
+    private static void initializeSampleData() {
+        inventory.put("DELUXE", 5);
+        inventory.put("SUITE", 2);
+
+        bookingHistory.put("B001", new Booking("B001", "Arun", "DELUXE", "D101"));
+        bookingHistory.put("B002", new Booking("B002", "Meera", "SUITE", "S201"));
+    }
+
+    // ------------------------------------------------------
+    // Restore from file
+    // ------------------------------------------------------
+    private static void restoreSystemState() {
+        SystemState restored = storage.loadSystemState();
+        if (restored != null) {
+            inventory = restored.inventory;
+            bookingHistory = restored.bookingHistory;
+        }
+    }
+
+    // ------------------------------------------------------
+    // Save to file
+    // ------------------------------------------------------
+    private static void saveSystemState() {
+        SystemState state = new SystemState(inventory, bookingHistory);
+        storage.saveSystemState(state);
+        System.out.println("\nSystem shutting down...");
+    }
+
+    // ------------------------------------------------------
+    // Display system state
+    // ------------------------------------------------------
+    private static void displaySystemState() {
+        System.out.println("\n--- Current Inventory ---");
+        inventory.forEach((k, v) -> System.out.println(k + " : " + v));
+
+        System.out.println("\n--- Current Bookings ---");
+        bookingHistory.values().forEach(System.out::println);
+    }
+}
