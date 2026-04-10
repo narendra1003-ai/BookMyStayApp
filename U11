@@ -1,0 +1,124 @@
+import java.util.*;
+
+class InventoryManager {
+    private Map<String, Integer> roomInventory = new HashMap<>();
+
+    public InventoryManager() {
+        roomInventory.put("DELUXE", 3);
+        roomInventory.put("SUITE", 2);
+    }
+
+    // Thread-safe synchronized allocation
+    public synchronized boolean allocateRoom(String roomType) {
+        int count = roomInventory.get(roomType);
+
+        if (count > 0) {
+            roomInventory.put(roomType, count - 1);
+            return true;
+        }
+        return false;
+    }
+
+    public synchronized void printInventory() {
+        System.out.println("\n--- Final Inventory After Concurrent Booking ---");
+        roomInventory.forEach((type, count) ->
+                System.out.println(type + " : " + count));
+    }
+}
+
+// Booking Request Object
+class BookingRequest {
+    String guestName;
+    String roomType;
+
+    BookingRequest(String guestName, String roomType) {
+        this.guestName = guestName;
+        this.roomType = roomType;
+    }
+}
+
+// Concurrent Booking Processor Thread
+class BookingProcessor extends Thread {
+    private Queue<BookingRequest> requestQueue;
+    private InventoryManager inventory;
+
+    BookingProcessor(Queue<BookingRequest> queue, InventoryManager inventory) {
+        this.requestQueue = queue;
+        this.inventory = inventory;
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            BookingRequest request = null;
+
+            // Thread-safe dequeue using synchronized block
+            synchronized (requestQueue) {
+                if (!requestQueue.isEmpty()) {
+                    request = requestQueue.poll();
+                } else {
+                    break;
+                }
+            }
+
+            if (request != null) {
+                processBooking(request);
+            }
+        }
+    }
+
+    private void processBooking(BookingRequest req) {
+        System.out.println(Thread.currentThread().getName() +
+                " processing booking for: " + req.guestName);
+
+        boolean allocated = inventory.allocateRoom(req.roomType);
+
+        if (allocated) {
+            System.out.println("✔ ROOM CONFIRMED → " + req.roomType +
+                    " for " + req.guestName);
+        } else {
+            System.out.println("❌ NO ROOMS AVAILABLE for " + req.guestName);
+        }
+    }
+}
+
+public class UseCase11ConcurrentBookingSimulation {
+    public static void main(String[] args) {
+
+        System.out.println("=== USE CASE 11: CONCURRENT BOOKING SIMULATION ===");
+
+        // Shared inventory & request queue
+        InventoryManager inventory = new InventoryManager();
+        Queue<BookingRequest> requestQueue = new LinkedList<>();
+
+        // Adding sample guest requests
+        requestQueue.add(new BookingRequest("Arun", "DELUXE"));
+        requestQueue.add(new BookingRequest("Meera", "DELUXE"));
+        requestQueue.add(new BookingRequest("John", "DELUXE"));
+        requestQueue.add(new BookingRequest("Priya", "SUITE"));
+        requestQueue.add(new BookingRequest("Kiran", "SUITE"));
+        requestQueue.add(new BookingRequest("Ravi", "SUITE"));
+
+        // Creating concurrent booking threads
+        BookingProcessor t1 = new BookingProcessor(requestQueue, inventory);
+        BookingProcessor t2 = new BookingProcessor(requestQueue, inventory);
+        BookingProcessor t3 = new BookingProcessor(requestQueue, inventory);
+
+        // Starting threads
+        t1.start();
+        t2.start();
+        t3.start();
+
+        // Wait for threads to finish
+        try {
+            t1.join();
+            t2.join();
+            t3.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        // Final inventory report
+        inventory.printInventory();
+    }
+}
